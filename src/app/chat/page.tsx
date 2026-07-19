@@ -1,0 +1,70 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import AppShell from "@/components/AppShell";
+
+// /chat — landing inside the app: nudges setup, or starts a fresh chat.
+export default function ChatHome() {
+  const router = useRouter();
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+  const [credits, setCredits] = useState(0);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.paywallPassed) {
+          router.replace("/paywall");
+          return;
+        }
+        setHasApiKey(!!d.hasApiKey);
+        setCredits(d.credits ?? 0);
+      })
+      .catch(() => {});
+  }, [router]);
+
+  async function start() {
+    setCreating(true);
+    try {
+      const res = await fetch("/api/chats", { method: "POST", body: "{}" });
+      const data = await res.json();
+      if (res.ok) router.push(`/chat/${data.chat.id}`);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <AppShell>
+      <div className="h-full flex items-center justify-center px-6">
+        <div className="text-center max-w-md">
+          <div className="text-4xl mb-4">🔬</div>
+          <h1 className="text-2xl font-semibold">Deep research, on demand</h1>
+          <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
+            MicroManus searches the web, reads sources, reasons in a loop, and can
+            produce PDF reports. You have{" "}
+            <span className="text-indigo-300 font-medium">{credits} credits</span>.
+          </p>
+          {hasApiKey === false ? (
+            <button
+              onClick={() => router.push("/settings?welcome=1")}
+              className="mt-6 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition px-6 py-2.5 text-sm font-medium"
+            >
+              Add your API key to begin →
+            </button>
+          ) : (
+            <button
+              onClick={start}
+              disabled={creating || hasApiKey === null}
+              className="mt-6 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition px-6 py-2.5 text-sm font-medium disabled:opacity-60"
+            >
+              {creating ? "Starting…" : "Start a new research chat"}
+            </button>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
