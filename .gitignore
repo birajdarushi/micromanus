@@ -44,3 +44,7 @@ next-env.d.ts
 razorx.env
 .env.local
 .env*.local
+
+# supabase CLI temp
+supabase/.temp/
+emergent styles

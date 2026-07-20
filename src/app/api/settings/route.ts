@@ -45,7 +45,13 @@ export async function POST(req: NextRequest) {
   if (!user) return Response.json({ error: "Not authenticated" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  const baseUrl: string = (body?.baseUrl ?? "").trim().replace(/\/+$/, "");
+  // Normalize the base URL: the OpenAI client appends "/chat/completions" itself,
+  // so strip it if the user pasted the full endpoint (a very common mistake).
+  const baseUrl: string = (body?.baseUrl ?? "")
+    .trim()
+    .replace(/\/+$/, "")
+    .replace(/\/chat\/completions$/, "")
+    .replace(/\/+$/, "");
   const apiKey: string = (body?.apiKey ?? "").trim();
   const defaultModel: string = (body?.defaultModel ?? "").trim();
 
@@ -57,6 +63,21 @@ export async function POST(req: NextRequest) {
     if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error();
   } catch {
     return Response.json({ error: "Invalid base URL" }, { status: 400 });
+  }
+
+  // An API key goes into an HTTP Authorization header, which only permits
+  // printable ASCII. Reject anything with spaces/newlines/non-ASCII up front —
+  // otherwise it saves fine but crashes the agent later with a cryptic
+  // "Cannot convert argument to a ByteString" error. This also catches the
+  // common mistake of pasting a prompt into the API key field.
+  if (apiKey && !/^[\x21-\x7E]+$/.test(apiKey)) {
+    return Response.json(
+      {
+        error:
+          "That doesn't look like an API key — it contains spaces or non-ASCII characters. Paste your provider key (e.g. sk-…), not a prompt or other text.",
+      },
+      { status: 400 }
+    );
   }
 
   const admin = createSupabaseAdmin();

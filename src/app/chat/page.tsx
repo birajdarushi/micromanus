@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight, KeyRound } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import Mascot from "@/components/Mascot";
 
 // /chat — landing inside the app: nudges setup, or starts a fresh chat.
 export default function ChatHome() {
@@ -39,28 +41,34 @@ export default function ChatHome() {
   return (
     <AppShell>
       <div className="h-full flex items-center justify-center px-6">
-        <div className="text-center max-w-md">
-          <div className="text-4xl mb-4">🔬</div>
-          <h1 className="text-2xl font-semibold">Deep research, on demand</h1>
+        <div className="text-center max-w-md flex flex-col items-center animate-in fade-in duration-300">
+          <Mascot state="idle" size={96} className="mb-3" />
+          <h1 className="font-heading text-2xl font-medium tracking-tight text-zinc-50">
+            Deep research, on demand
+          </h1>
           <p className="text-zinc-400 text-sm mt-2 leading-relaxed">
             MicroManus searches the web, reads sources, reasons in a loop, and can
             produce PDF reports. You have{" "}
-            <span className="text-indigo-300 font-medium">{credits} credits</span>.
+            <span className="text-amber-400 font-mono font-medium">{credits} credits</span>.
           </p>
           {hasApiKey === false ? (
             <button
               onClick={() => router.push("/settings?welcome=1")}
-              className="mt-6 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition px-6 py-2.5 text-sm font-medium"
+              data-testid="add-key-btn"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-400 text-zinc-950 hover:bg-amber-500 transition-colors px-6 py-2.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus-visible:outline-none"
             >
-              Add your API key to begin →
+              <KeyRound size={16} strokeWidth={1.5} />
+              Add your API key to begin
             </button>
           ) : (
             <button
               onClick={start}
               disabled={creating || hasApiKey === null}
-              className="mt-6 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition px-6 py-2.5 text-sm font-medium disabled:opacity-60"
+              data-testid="start-chat-btn"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-amber-400 text-zinc-950 hover:bg-amber-500 transition-colors px-6 py-2.5 text-sm font-medium disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus-visible:outline-none"
             >
               {creating ? "Starting…" : "Start a new research chat"}
+              {!creating && <ArrowRight size={16} strokeWidth={1.5} />}
             </button>
           )}
         </div>

@@ -2,7 +2,7 @@
 // Cost is computed per usage event: input / output / cached tokens priced separately.
 // cachedIn = price for tokens served from the provider's prompt cache.
 
-export type Provider = "anthropic" | "openai" | "kimi";
+export type Provider = "anthropic" | "openai" | "kimi" | "google";
 
 export interface ModelInfo {
   id: string;
@@ -32,6 +32,13 @@ export const MODELS: ModelInfo[] = [
   { id: "kimi-k2-thinking",      label: "Kimi K2 Thinking", provider: "kimi", input: 0.6, output: 2.5, cachedIn: 0.15, hint: "https://api.moonshot.ai/v1" },
   { id: "kimi-k2-0905-preview",  label: "Kimi K2 (0905)",   provider: "kimi", input: 0.6, output: 2.5, cachedIn: 0.15, hint: "https://api.moonshot.ai/v1" },
   { id: "kimi-latest",           label: "Kimi Latest",      provider: "kimi", input: 0.6, output: 2.5, cachedIn: 0.15, hint: "https://api.moonshot.ai/v1" },
+
+  // ---- Gemini (Google, OpenAI-compatible endpoint; has a free tier) ----
+  // Standard list pricing — used for cost estimation even when running on the free tier.
+  { id: "gemini-flash-latest",      label: "Gemini Flash (latest)", provider: "google", input: 0.3,  output: 2.5, cachedIn: 0.075, hint: "https://generativelanguage.googleapis.com/v1beta/openai/" },
+  { id: "gemini-flash-lite-latest", label: "Gemini Flash Lite",     provider: "google", input: 0.1,  output: 0.4, cachedIn: 0.025, hint: "https://generativelanguage.googleapis.com/v1beta/openai/" },
+  { id: "gemini-2.5-flash",         label: "Gemini 2.5 Flash",      provider: "google", input: 0.3,  output: 2.5, cachedIn: 0.075, hint: "https://generativelanguage.googleapis.com/v1beta/openai/" },
+  { id: "gemini-3.5-flash",         label: "Gemini 3.5 Flash",      provider: "google", input: 0.3,  output: 2.5, cachedIn: 0.075, hint: "https://generativelanguage.googleapis.com/v1beta/openai/" },
 ];
 
 export function getModel(id: string): ModelInfo | undefined {

@@ -2,7 +2,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { ShieldCheck } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import Mascot from "@/components/Mascot";
 
 interface ModelInfo {
   id: string;
@@ -14,6 +17,9 @@ interface ModelInfo {
   hint: string;
 }
 
+const inputClass =
+  "w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2.5 text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20";
+
 function SettingsInner() {
   const params = useSearchParams();
   const router = useRouter();
@@ -24,27 +30,38 @@ function SettingsInner() {
   const [apiKey, setApiKey] = useState("");
   const [keyPreview, setKeyPreview] = useState<string | null>(null);
   const [model, setModel] = useState("");
+  const [customMode, setCustomMode] = useState(false);
+  const [customModel, setCustomModel] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((d) => {
-        setModels(d.models ?? []);
+        const catalog: ModelInfo[] = d.models ?? [];
+        setModels(catalog);
         if (d.config) {
           setBaseUrl(d.config.baseUrl);
-          setModel(d.config.defaultModel);
           setKeyPreview(d.config.keyPreview);
-        } else if (d.models?.length) {
-          setModel(d.models[0].id);
-          setBaseUrl(d.models[0].hint);
+          // if the saved model isn't in the catalog, it's a custom id — restore custom mode
+          if (catalog.some((m) => m.id === d.config.defaultModel)) {
+            setModel(d.config.defaultModel);
+          } else {
+            setCustomMode(true);
+            setCustomModel(d.config.defaultModel);
+            if (catalog.length) setModel(catalog[0].id);
+          }
+        } else if (catalog.length) {
+          setModel(catalog[0].id);
+          setBaseUrl(catalog[0].hint);
         }
       })
       .catch(() => {});
   }, []);
 
   const selected = models.find((m) => m.id === model);
+  // the model id actually sent to the server / used for pricing
+  const effectiveModel = customMode ? customModel.trim() : model;
 
   function onModelChange(id: string) {
     setModel(id);
@@ -58,16 +75,15 @@ function SettingsInner() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setMsg(null);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl, apiKey, defaultModel: model }),
+        body: JSON.stringify({ baseUrl, apiKey, defaultModel: effectiveModel }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setMsg({ kind: "ok", text: "Saved. You're ready to research!" });
+      toast.success("Saved. You're ready to research.");
       setApiKey("");
       if (welcome) setTimeout(() => router.push("/chat"), 900);
       else {
@@ -75,62 +91,110 @@ function SettingsInner() {
         setKeyPreview(r.config?.keyPreview ?? null);
       }
     } catch (err) {
-      setMsg({ kind: "err", text: err instanceof Error ? err.message : "Save failed" });
+      toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setBusy(false);
     }
   }
 
-  const groups: Array<[string, ModelInfo[]]> = ["anthropic", "openai", "kimi"].map((p) => [
-    p,
-    models.filter((m) => m.provider === p),
-  ]);
+  const groups: Array<[string, ModelInfo[]]> = ["anthropic", "openai", "kimi", "google"].map(
+    (p) => [p, models.filter((m) => m.provider === p)]
+  );
+
+  const groupLabel = (p: string) =>
+    p === "anthropic"
+      ? "Claude (Anthropic)"
+      : p === "openai"
+      ? "OpenAI"
+      : p === "kimi"
+      ? "Kimi (Moonshot)"
+      : "Gemini (Google)";
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-zinc-400 text-sm mt-1">
-          MicroManus never ships with a key — bring your own OpenAI-compatible API key
-          and endpoint. It is encrypted at rest (AES-256-GCM).
-        </p>
+      <div className="max-w-2xl mx-auto px-6 py-10 animate-in fade-in duration-300">
+        <div className="flex items-center gap-3">
+          <Mascot state="settings" size={44} />
+          <div>
+            <h1 className="font-heading text-2xl font-medium tracking-tight text-zinc-50">
+              Settings
+            </h1>
+            <p className="text-zinc-400 text-sm mt-0.5 flex items-center gap-1.5">
+              <ShieldCheck size={14} strokeWidth={1.5} className="text-amber-400 shrink-0" />
+              Bring your own OpenAI-compatible key — encrypted at rest (AES-256-GCM).
+            </p>
+          </div>
+        </div>
 
         {welcome && (
-          <div className="mt-4 rounded-lg border border-indigo-800 bg-indigo-950/50 text-indigo-300 p-3 text-sm">
-            🎉 You&apos;re unlocked! One last step: add your LLM API key below.
+          <div className="mt-6 rounded-lg border border-amber-400/30 bg-amber-400/5 text-amber-300 p-3 text-sm">
+            You&apos;re unlocked. One last step: add your LLM API key below.
           </div>
         )}
 
         <form onSubmit={save} className="mt-8 space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-1.5">Model</label>
-            <select
-              value={model}
-              onChange={(e) => onModelChange(e.target.value)}
-              className="w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
-            >
-              {groups.map(([provider, list]) =>
-                list.length ? (
-                  <optgroup
-                    key={provider}
-                    label={
-                      provider === "anthropic" ? "Claude (Anthropic)" : provider === "openai" ? "OpenAI" : "Kimi (Moonshot)"
-                    }
-                  >
-                    {list.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.label} — ${m.input}/M in · ${m.output}/M out
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : null
-              )}
-            </select>
-            {selected && (
-              <p className="text-xs text-zinc-500 mt-1.5">
-                Pricing used for cost tracking: ${selected.input}/M input · $
-                {selected.output}/M output · ${selected.cachedIn}/M cached input.
-              </p>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium">Model</label>
+              <label className="flex items-center gap-1.5 font-mono text-xs text-zinc-400 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={customMode}
+                  onChange={(e) => setCustomMode(e.target.checked)}
+                  data-testid="custom-model-toggle"
+                  className="accent-amber-400"
+                />
+                Advanced: custom model id
+              </label>
+            </div>
+
+            {!customMode ? (
+              <>
+                <select
+                  value={model}
+                  onChange={(e) => onModelChange(e.target.value)}
+                  data-testid="model-select"
+                  className={`${inputClass} font-mono`}
+                >
+                  {groups.map(([provider, list]) =>
+                    list.length ? (
+                      <optgroup key={provider} label={groupLabel(provider)}>
+                        {list.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.label} — ${m.input}/M in · ${m.output}/M out
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : null
+                  )}
+                </select>
+                {selected && (
+                  <p className="font-mono text-xs text-zinc-500 mt-1.5">
+                    Pricing used for cost tracking: ${selected.input}/M input · $
+                    {selected.output}/M output · ${selected.cachedIn}/M cached input.
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                <input
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  placeholder="e.g. moonshotai/kimi-k2:free"
+                  data-testid="custom-model-input"
+                  className={`${inputClass} font-mono`}
+                />
+                <p className="font-mono text-xs text-zinc-500 mt-1.5 leading-relaxed">
+                  Enter any model id your endpoint accepts — e.g. OpenRouter free models
+                  (<code className="text-zinc-400">moonshotai/kimi-k2:free</code>,{" "}
+                  <code className="text-zinc-400">z-ai/glm-4.5-air:free</code>) or Gemini
+                  (<code className="text-zinc-400">gemini-2.5-flash</code> with base URL{" "}
+                  <code className="text-zinc-400">
+                    https://generativelanguage.googleapis.com/v1beta/openai/
+                  </code>
+                  ). Tokens are tracked; unknown ids record cost as $0.
+                </p>
+              </>
             )}
           </div>
 
@@ -142,12 +206,15 @@ function SettingsInner() {
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://api.openai.com/v1"
-              className="w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500"
+              data-testid="base-url-input"
+              className={`${inputClass} font-mono`}
             />
-            <p className="text-xs text-zinc-500 mt-1.5">
-              Works with OpenAI, Anthropic (<code>https://api.anthropic.com/v1</code>),
-              Moonshot (<code>https://api.moonshot.ai/v1</code>) or any router like
-              OpenRouter (<code>https://openrouter.ai/api/v1</code>).
+            <p className="font-mono text-xs text-zinc-500 mt-1.5 leading-relaxed">
+              Works with OpenAI, Anthropic (
+              <code className="text-zinc-400">https://api.anthropic.com/v1</code>), Moonshot (
+              <code className="text-zinc-400">https://api.moonshot.ai/v1</code>) or any router
+              like OpenRouter (
+              <code className="text-zinc-400">https://openrouter.ai/api/v1</code>).
             </p>
           </div>
 
@@ -158,23 +225,19 @@ function SettingsInner() {
               onChange={(e) => setApiKey(e.target.value)}
               type="password"
               placeholder={keyPreview ? `Saved: ${keyPreview} — enter a new key to replace` : "sk-…"}
-              className="w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-indigo-500"
+              data-testid="api-key-input"
+              className={`${inputClass} font-mono`}
             />
           </div>
 
           <button
             type="submit"
-            disabled={busy || !baseUrl || !model || (!apiKey && !keyPreview)}
-            className="rounded-lg bg-indigo-500 hover:bg-indigo-400 transition px-5 py-2.5 text-sm font-medium disabled:opacity-60"
+            disabled={busy || !baseUrl || !effectiveModel || (!apiKey && !keyPreview)}
+            data-testid="save-settings-btn"
+            className="rounded-lg bg-amber-400 text-zinc-950 hover:bg-amber-500 transition-colors px-5 py-2.5 text-sm font-medium disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus-visible:outline-none"
           >
             {busy ? "Validating & saving…" : "Save settings"}
           </button>
-
-          {msg && (
-            <p className={`text-sm ${msg.kind === "ok" ? "text-emerald-400" : "text-red-400"}`}>
-              {msg.text}
-            </p>
-          )}
         </form>
       </div>
     </div>

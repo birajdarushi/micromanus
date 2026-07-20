@@ -18,11 +18,24 @@ Tools available:
 - fetch_url: read a promising page in depth
 - create_pdf_report: generate a downloadable PDF report artifact
 
-Guidelines:
-- For research questions, search first — do not answer purely from memory when current facts matter. Cross-check across multiple sources.
-- Cite sources inline with their URLs in your final answer.
-- When the user asks for a report or document, do the research first, then call create_pdf_report with a complete, well-structured markdown body (use # headings and bullet lists), then summarize the report in chat and mention the PDF is attached.
-- Keep intermediate steps focused; put the substance in the final answer.
+Research guidelines:
+- For research questions, search first — do not answer purely from memory when current facts matter. Run several focused queries and read the most promising pages before concluding. Cross-check across multiple sources.
+- Cite sources inline with their URLs, and end your answer with a "## Sources" section listing the URLs you used.
+- Write clean, readable prose. Do NOT paste raw notes, scratch text, planning shorthand, or meta-commentary into the answer.
+
+Producing PDF reports (important):
+- If the user asks for a "report", "PDF", "document", "write-up", or to add to / expand a previous report, you MUST call create_pdf_report — do not just answer in chat.
+- On a follow-up like "now include X too", regenerate the FULL updated report (previous content + the new material), not just the new part, and call create_pdf_report again. A new PDF is expected each time.
+- Structure every report like a professional analyst, using markdown:
+  # Title
+  A one-paragraph executive summary.
+  ## Section headings for each theme
+  - Bullet points for key facts
+  Use a markdown table ( | col | col | / |---|---| ) when comparing things.
+  End with ## Sources listing the URLs.
+- After creating the PDF, give a short summary in chat and tell the user the PDF is attached.
+
+- Keep intermediate tool steps focused; put the substance in the final answer.
 - Answer in the language the user writes in.`;
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -80,6 +93,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // decrypt + validate the key BEFORE charging a credit, so a bad key never
+  // costs the user a run.
+  let apiKey: string;
+  try {
+    apiKey = decryptSecret(cfg.api_key_encrypted);
+  } catch {
+    return Response.json({ error: "key_decrypt_failed" }, { status: 500 });
+  }
+  // API keys go into an Authorization header (printable ASCII only). A non-ASCII
+  // value (e.g. a prompt pasted into the key field) would otherwise crash the
+  // request with a cryptic ByteString error mid-run.
+  if (!/^[\x21-\x7E]+$/.test(apiKey)) {
+    return Response.json(
+      {
+        error: "no_api_key",
+        message:
+          "Your saved API key looks invalid (it contains spaces or non-ASCII characters). Re-enter a valid provider key in Settings.",
+      },
+      { status: 428 }
+    );
+  }
+
   // consume 1 credit per agent run (atomic)
   const { data: remaining, error: creditErr } = await admin.rpc("consume_credit", {
     p_user_id: user.id,
@@ -90,13 +125,6 @@ export async function POST(req: NextRequest) {
       { error: "no_credits", message: "You are out of credits." },
       { status: 402 }
     );
-  }
-
-  let apiKey: string;
-  try {
-    apiKey = decryptSecret(cfg.api_key_encrypted);
-  } catch {
-    return Response.json({ error: "key_decrypt_failed" }, { status: 500 });
   }
 
   const model = chat.model || cfg.default_model;
@@ -160,17 +188,44 @@ export async function POST(req: NextRequest) {
         }
       }, 15_000);
 
+      // Call the model, retrying on transient rate limits (429) / overload (503)
+      // with exponential backoff. Free-tier providers (e.g. Gemini) throttle by
+      // requests-per-minute, and one agent run makes many sequential calls.
+      const callModel = async () => {
+        const maxRetries = 4;
+        let delay = 3000;
+        for (let attempt = 0; ; attempt++) {
+          try {
+            return await client.chat.completions.create({
+              model,
+              messages,
+              tools: TOOL_DEFINITIONS,
+              tool_choice: "auto",
+            });
+          } catch (e) {
+            const status = (e as { status?: number })?.status;
+            if ((status === 429 || status === 503) && attempt < maxRetries) {
+              send({
+                type: "status",
+                text: `Rate limited by the model provider — waiting ${Math.round(
+                  delay / 1000
+                )}s (retry ${attempt + 1}/${maxRetries})…`,
+              });
+              await new Promise((r) => setTimeout(r, delay));
+              delay = Math.min(delay * 2, 20_000);
+              continue;
+            }
+            throw e;
+          }
+        }
+      };
+
       let finalText = "";
       try {
         send({ type: "status", text: "Thinking…" });
 
         for (let i = 0; i < MAX_ITERATIONS; i++) {
-          const completion = await client.chat.completions.create({
-            model,
-            messages,
-            tools: TOOL_DEFINITIONS,
-            tool_choice: "auto",
-          });
+          const completion = await callModel();
 
           const usage = completion.usage;
           if (usage) {
@@ -267,7 +322,19 @@ export async function POST(req: NextRequest) {
           creditsRemaining: remaining,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Agent failed";
+        const status = (err as { status?: number })?.status;
+        let message = err instanceof Error ? err.message : "Agent failed";
+        // provider errors come through as bodyless "NNN status code" — translate
+        // the common ones into something actionable.
+        if (status === 429) {
+          message =
+            "The model provider rate-limited this request (free-tier requests-per-minute limit). Wait a minute and try again, or switch to a model/provider with higher limits.";
+        } else if (status === 404) {
+          message = `Model "${model}" wasn't found at this endpoint — it may be deprecated or misspelled. Pick a current model in Settings.`;
+        } else if (status === 401 || status === 403) {
+          message =
+            "The provider rejected your API key (401/403). Re-check the key and base URL in Settings.";
+        }
         // refund the credit on hard failure before any answer was produced
         if (!finalText) {
           await admin.rpc("consume_credit", { p_user_id: user.id, p_amount: -1 });
