@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createSupabaseBrowser } from "@/lib/supabase/client";
 import Mascot from "@/components/Mascot";
@@ -11,12 +11,32 @@ const BG =
 export default function LoginPage() {
   const [loading, setLoading] = useState<string | null>(null);
 
+  // Surface OAuth / callback failures (e.g. GitHub misconfig, email already used)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const err = q.get("error");
+    if (!err) return;
+    const message = q.get("message");
+    const friendly =
+      message ||
+      (err === "oauth"
+        ? "OAuth provider rejected the login. Check the GitHub OAuth app callback URL."
+        : "Sign-in failed. Try again, or use a different provider.");
+    toast.error(decodeURIComponent(friendly));
+    // clean the query so a refresh doesn’t re-toast
+    window.history.replaceState(null, "", "/login");
+  }, []);
+
   async function signIn(provider: "google" | "github") {
     setLoading(provider);
     const supabase = createSupabaseBrowser();
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // GitHub: request email so Supabase can create a profile
+        scopes: provider === "github" ? "read:user user:email" : undefined,
+      },
     });
     if (error) {
       toast.error(error.message);
