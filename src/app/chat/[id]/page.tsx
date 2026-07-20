@@ -5,7 +5,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   return (
     <AppShell>
-      <ChatWindow chatId={id} />
+      <ChatWindow initialChatId={id} />
     </AppShell>
   );
 }
