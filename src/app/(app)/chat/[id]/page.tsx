@@ -1,11 +1,6 @@
-import AppShell from "@/components/AppShell";
 import ChatWindow from "@/components/ChatWindow";
 
 export default async function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return (
-    <AppShell>
-      <ChatWindow initialChatId={id} />
-    </AppShell>
-  );
+  return <ChatWindow initialChatId={id} />;
 }

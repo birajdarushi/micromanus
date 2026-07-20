@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AppShell from "@/components/AppShell";
 import Mascot from "@/components/Mascot";
 
 interface ChatStats {
@@ -166,9 +165,5 @@ function UsageInner() {
 }
 
 export default function UsagePage() {
-  return (
-    <AppShell>
-      <UsageInner />
-    </AppShell>
-  );
+  return <UsageInner />;
 }

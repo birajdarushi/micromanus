@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, ArrowDownToLine, ExternalLink, Loader2 } from "lucide-react";
-import AppShell from "@/components/AppShell";
 import Mascot from "@/components/Mascot";
 import { timeAgo } from "@/lib/time";
 
@@ -27,7 +26,6 @@ export default function ReportsPage() {
   }, []);
 
   return (
-    <AppShell>
       <div className="h-full overflow-y-auto">
         <div className="max-w-4xl mx-auto px-6 py-10 animate-in fade-in duration-300">
           <div className="flex items-center gap-3 pr-32">
@@ -118,6 +116,5 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
-    </AppShell>
   );
 }

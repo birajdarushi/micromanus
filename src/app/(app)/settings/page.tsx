@@ -4,7 +4,6 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
-import AppShell from "@/components/AppShell";
 import Mascot from "@/components/Mascot";
 import Dropdown, { type DropdownOption } from "@/components/Dropdown";
 import AccentPicker from "@/components/AccentPicker";
@@ -307,10 +306,8 @@ function SettingsInner() {
 
 export default function SettingsPage() {
   return (
-    <AppShell>
-      <Suspense>
-        <SettingsInner />
-      </Suspense>
-    </AppShell>
+    <Suspense>
+      <SettingsInner />
+    </Suspense>
   );
 }
