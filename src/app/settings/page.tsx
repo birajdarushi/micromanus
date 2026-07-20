@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import Mascot from "@/components/Mascot";
+import Dropdown, { type DropdownOption } from "@/components/Dropdown";
+import AccentPicker from "@/components/AccentPicker";
 
 interface ModelInfo {
   id: string;
@@ -18,7 +20,7 @@ interface ModelInfo {
 }
 
 const inputClass =
-  "w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2.5 text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/20";
+  "w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2.5 text-sm focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500/25";
 
 function SettingsInner() {
   const params = useSearchParams();
@@ -33,6 +35,31 @@ function SettingsInner() {
   const [customMode, setCustomMode] = useState(false);
   const [customModel, setCustomModel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [promo, setPromo] = useState("");
+  const [redeeming, setRedeeming] = useState(false);
+
+  async function redeem(e: React.FormEvent) {
+    e.preventDefault();
+    const code = promo.trim();
+    if (!code) return;
+    setRedeeming(true);
+    try {
+      const res = await fetch("/api/billing/coupon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Invalid code");
+      toast.success(`${d.creditsGranted ?? 5} credits added`);
+      setPromo("");
+      window.dispatchEvent(new Event("mm:refresh"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't redeem that code");
+    } finally {
+      setRedeeming(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/settings")
@@ -110,24 +137,32 @@ function SettingsInner() {
       ? "Kimi (Moonshot)"
       : "Gemini (Google)";
 
+  const modelOptions: DropdownOption[] = groups.flatMap(([provider, list]) =>
+    list.map((m) => ({
+      value: m.id,
+      label: m.label,
+      hint: `${groupLabel(provider)} · $${m.input}/M in · $${m.output}/M out`,
+    }))
+  );
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-10 animate-in fade-in duration-300">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pr-32">
           <Mascot state="settings" size={44} />
-          <div>
+          <div className="min-w-0">
             <h1 className="font-heading text-2xl font-medium tracking-tight text-zinc-50">
               Settings
             </h1>
             <p className="text-zinc-400 text-sm mt-0.5 flex items-center gap-1.5">
-              <ShieldCheck size={14} strokeWidth={1.5} className="text-amber-400 shrink-0" />
+              <ShieldCheck size={14} strokeWidth={1.5} className="text-accent-400 shrink-0" />
               Bring your own OpenAI-compatible key — encrypted at rest (AES-256-GCM).
             </p>
           </div>
         </div>
 
         {welcome && (
-          <div className="mt-6 rounded-lg border border-amber-400/30 bg-amber-400/5 text-amber-300 p-3 text-sm">
+          <div className="mt-6 rounded-lg border border-accent-500/30 bg-accent-500/5 text-accent-300 p-3 text-sm">
             You&apos;re unlocked. One last step: add your LLM API key below.
           </div>
         )}
@@ -142,7 +177,7 @@ function SettingsInner() {
                   checked={customMode}
                   onChange={(e) => setCustomMode(e.target.checked)}
                   data-testid="custom-model-toggle"
-                  className="accent-amber-400"
+                  className="accent-accent-500"
                 />
                 Advanced: custom model id
               </label>
@@ -150,24 +185,14 @@ function SettingsInner() {
 
             {!customMode ? (
               <>
-                <select
+                <Dropdown
                   value={model}
-                  onChange={(e) => onModelChange(e.target.value)}
+                  onChange={onModelChange}
+                  options={modelOptions}
                   data-testid="model-select"
-                  className={`${inputClass} font-mono`}
-                >
-                  {groups.map(([provider, list]) =>
-                    list.length ? (
-                      <optgroup key={provider} label={groupLabel(provider)}>
-                        {list.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.label} — ${m.input}/M in · ${m.output}/M out
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : null
-                  )}
-                </select>
+                  aria-label="Model"
+                  buttonClassName="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-200 hover:border-zinc-700 focus-visible:border-accent-500"
+                />
                 {selected && (
                   <p className="font-mono text-xs text-zinc-500 mt-1.5">
                     Pricing used for cost tracking: ${selected.input}/M input · $
@@ -234,11 +259,47 @@ function SettingsInner() {
             type="submit"
             disabled={busy || !baseUrl || !effectiveModel || (!apiKey && !keyPreview)}
             data-testid="save-settings-btn"
-            className="rounded-lg bg-amber-400 text-zinc-950 hover:bg-amber-500 transition-colors px-5 py-2.5 text-sm font-medium disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus-visible:outline-none"
+            className="rounded-lg bg-accent-600 text-white hover:bg-accent-500 transition-colors px-5 py-2.5 text-sm font-medium disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 focus-visible:outline-none"
           >
             {busy ? "Validating & saving…" : "Save settings"}
           </button>
         </form>
+
+        <div className="mt-10 border-t border-zinc-800 pt-8 space-y-8">
+          {/* Appearance / accent */}
+          <div>
+            <h2 className="text-sm font-medium text-zinc-100">Accent color</h2>
+            <p className="text-zinc-500 text-xs mt-1 mb-3">
+              Recolour the whole UI. Saved to this browser.
+            </p>
+            <AccentPicker />
+          </div>
+
+          {/* Promo code */}
+          <div>
+            <h2 className="text-sm font-medium text-zinc-100">Promo code</h2>
+            <p className="text-zinc-500 text-xs mt-1 mb-3">
+              Have a code? Redeem it to add credits.
+            </p>
+            <form onSubmit={redeem} className="flex gap-2 max-w-sm">
+              <input
+                value={promo}
+                onChange={(e) => setPromo(e.target.value)}
+                placeholder="Enter promo code"
+                data-testid="promo-input"
+                className={`${inputClass} font-mono`}
+              />
+              <button
+                type="submit"
+                disabled={redeeming || !promo.trim()}
+                data-testid="promo-redeem-btn"
+                className="shrink-0 rounded-lg bg-zinc-100 text-zinc-900 px-4 py-2 text-sm font-medium hover:bg-white transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-none"
+              >
+                {redeeming ? "Redeeming…" : "Redeem"}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   );

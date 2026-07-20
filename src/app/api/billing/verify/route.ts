@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import { NextRequest } from "next/server";
+import Razorpay from "razorpay";
 import { createSupabaseServer, createSupabaseAdmin } from "@/lib/supabase/server";
-import { CREDITS_PER_UNLOCK } from "@/lib/billing";
+import { CREDITS_PER_UNLOCK, MAX_CREDITS } from "@/lib/billing";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,21 @@ export async function POST(req: NextRequest) {
     .eq("status", "created"); // guard against double-grant
   if (updErr) return Response.json({ error: updErr.message }, { status: 500 });
 
+  // How many credits this order was for is server-authoritative: read it back
+  // from the Razorpay order notes we set at creation (never trust the client).
+  let granted = CREDITS_PER_UNLOCK;
+  try {
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    });
+    const order = await razorpay.orders.fetch(orderId);
+    const n = Number((order.notes as { credits?: string } | undefined)?.credits);
+    if (Number.isFinite(n) && n > 0) granted = Math.min(n, MAX_CREDITS);
+  } catch {
+    /* fall back to the default pack size */
+  }
+
   const { data: profile } = await admin
     .from("profiles")
     .select("credits")
@@ -63,11 +79,11 @@ export async function POST(req: NextRequest) {
   await admin
     .from("profiles")
     .update({
-      credits: (profile?.credits ?? 0) + CREDITS_PER_UNLOCK,
+      credits: (profile?.credits ?? 0) + granted,
       paywall_passed: true,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
 
-  return Response.json({ ok: true, creditsGranted: CREDITS_PER_UNLOCK });
+  return Response.json({ ok: true, creditsGranted: granted });
 }

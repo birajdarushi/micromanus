@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import Mascot from "@/components/Mascot";
-import BuyCreditsButton from "@/components/BuyCreditsButton";
 
 interface ChatStats {
   chatId: string | null;
@@ -72,9 +71,9 @@ function UsageInner() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-6 md:px-8 py-10 animate-in fade-in duration-300">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pr-32">
           <Mascot state="stats" size={44} />
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <h1 className="font-heading text-2xl font-medium tracking-tight text-zinc-50">
               Cost &amp; stats
             </h1>
@@ -82,7 +81,6 @@ function UsageInner() {
               Token usage and cost per chat, split by input, output, and cached tokens.
             </p>
           </div>
-          <BuyCreditsButton label="Buy 5 credits" />
         </div>
 
         {loading && <p className="mt-8 font-mono text-sm text-zinc-500">Loading usage…</p>}

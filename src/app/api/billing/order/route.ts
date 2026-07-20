@@ -1,17 +1,36 @@
+import { NextRequest } from "next/server";
 import Razorpay from "razorpay";
 import { createSupabaseServer, createSupabaseAdmin } from "@/lib/supabase/server";
-import { paywallPrice } from "@/lib/billing";
+import { paywallPrice, creditPurchase, perCreditAmount, MIN_CREDITS, MAX_CREDITS } from "@/lib/billing";
 
 export const runtime = "nodejs";
 
-export async function POST() {
+// Pricing info for the top-up UI (no side effects).
+export async function GET() {
+  const { currency } = paywallPrice();
+  return Response.json({
+    currency,
+    symbol: currency === "USD" ? "$" : "₹",
+    perCredit: perCreditAmount(), // smallest unit (paise/cents)
+    min: MIN_CREDITS,
+    max: MAX_CREDITS,
+  });
+}
+
+export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Not authenticated" }, { status: 401 });
 
-  const { currency, amount, display } = paywallPrice();
+  // A body with { credits } → variable top-up; no body → the fixed unlock pack.
+  const body = await req.json().catch(() => null);
+  const requested = Number(body?.credits);
+  const isTopUp = Number.isFinite(requested) && requested > 0;
+  const { currency, amount, display, credits } = isTopUp
+    ? creditPurchase(requested)
+    : { ...paywallPrice(), credits: 5 };
 
   const razorpay = new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID!,
@@ -23,7 +42,8 @@ export async function POST() {
       amount,
       currency,
       receipt: `mm_${user.id.slice(0, 8)}_${Date.now()}`,
-      notes: { user_id: user.id, purpose: "micromanus_unlock" },
+      // credits is server-authoritative here; verify() reads it back from the order.
+      notes: { user_id: user.id, purpose: "micromanus_credits", credits: String(credits) },
     });
 
     const admin = createSupabaseAdmin();
@@ -41,6 +61,7 @@ export async function POST() {
       amount,
       currency,
       display,
+      credits,
       keyId: process.env.RAZORPAY_KEY_ID,
     });
   } catch (err) {
