@@ -12,7 +12,8 @@ RAZORPAY_KEY_SECRET=
 COUPON_CODE=SID_DRDROID
 PAYWALL_CURRENCY=INR
 PAYWALL_AMOUNT=42500
-BRAVE_SEARCH_API_KEY=               # optional
+SERPAPI_API_KEY=                    # preferred web search (SerpAPI / Google)
+BRAVE_SEARCH_API_KEY=               # optional fallback if SerpAPI unset
 
 # Analytics (optional)
 NEXT_PUBLIC_POSTHOG_KEY=            # phc_…

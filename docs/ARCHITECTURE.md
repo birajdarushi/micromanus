@@ -75,8 +75,8 @@ the UX alive. Revisit only after everything else ships.
 
 ## Tools (`src/lib/agent/tools.ts`)
 
-- `web_search(query, count)` — Brave API when `BRAVE_SEARCH_API_KEY` is set, else
-  DuckDuckGo HTML fallback (keyless). Returns numbered title/URL/snippet list.
+- `web_search(query, count)` — **SerpAPI** (Google) when `SERPAPI_API_KEY` is set;
+  else Brave when `BRAVE_SEARCH_API_KEY` is set; else DuckDuckGo HTML (keyless).
 - `fetch_url(url)` — 15s timeout, http(s) only, SSRF guard (blocks localhost/private
   ranges/.internal), HTML→text strip, 12k char cap.
 - `image_search(query)` — Wikimedia Commons direct image URLs for PDF embeds.

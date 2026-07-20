@@ -140,30 +140,74 @@ export async function executeTool(
 async function webSearch(query: string, count: number): Promise<string> {
   if (!query) return "Error: empty query";
   const n = Math.min(Math.max(count || 6, 1), 10);
-  const key = process.env.BRAVE_SEARCH_API_KEY;
-  if (key) {
+
+  // 1) SerpAPI (Google results) — preferred when configured
+  const serpKey = process.env.SERPAPI_API_KEY?.trim();
+  if (serpKey) {
+    try {
+      const url =
+        `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}` +
+        `&num=${n}&api_key=${encodeURIComponent(serpKey)}`;
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        type Organic = { title?: string; link?: string; snippet?: string };
+        const organic: Organic[] = data?.organic_results ?? [];
+        if (organic.length) {
+          return organic
+            .slice(0, n)
+            .map(
+              (r, i) =>
+                `${i + 1}. ${r.title ?? "(no title)"}\n   URL: ${r.link ?? ""}\n   ${r.snippet ?? ""}`
+            )
+            .join("\n\n");
+        }
+        // SerpAPI sometimes returns answer_box / knowledge_graph with no organic
+        const answer = data?.answer_box?.answer || data?.answer_box?.snippet;
+        if (answer) {
+          return `1. ${data.answer_box?.title ?? "Answer"}\n   URL: ${data.answer_box?.link ?? ""}\n   ${answer}`;
+        }
+      } else {
+        console.error("[web_search] SerpAPI HTTP", res.status);
+      }
+    } catch (e) {
+      console.error("[web_search] SerpAPI error:", e instanceof Error ? e.message : e);
+    }
+    // fall through to Brave / DDG on SerpAPI failure
+  }
+
+  // 2) Brave Search API
+  const braveKey = process.env.BRAVE_SEARCH_API_KEY?.trim();
+  if (braveKey) {
     const res = await fetch(
       `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${n}`,
-      { headers: { "X-Subscription-Token": key, Accept: "application/json" } }
+      { headers: { "X-Subscription-Token": braveKey, Accept: "application/json" } }
     );
-    if (!res.ok) return `Search failed: HTTP ${res.status}`;
-    const data = await res.json();
-    type BraveResult = { title?: string; url?: string; description?: string };
-    const results: BraveResult[] = data?.web?.results ?? [];
-    if (!results.length) return "No results found.";
-    return results
-      .slice(0, n)
-      .map((r, i) => `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.description ?? ""}`)
-      .join("\n\n");
+    if (res.ok) {
+      const data = await res.json();
+      type BraveResult = { title?: string; url?: string; description?: string };
+      const results: BraveResult[] = data?.web?.results ?? [];
+      if (results.length) {
+        return results
+          .slice(0, n)
+          .map((r, i) => `${i + 1}. ${r.title}\n   URL: ${r.url}\n   ${r.description ?? ""}`)
+          .join("\n\n");
+      }
+    }
   }
-  // fallback: DuckDuckGo HTML (no key required)
+
+  // 3) DuckDuckGo HTML (keyless fallback)
   const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
     headers: { "User-Agent": "Mozilla/5.0 (MicroManus research agent)" },
   });
   if (!res.ok) return `Search failed: HTTP ${res.status}`;
   const html = await res.text();
   const items: string[] = [];
-  const re = /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div)>/g;
+  const re =
+    /<a[^>]*class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/(?:a|div)>/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) && items.length < n) {
     const url = decodeDdgUrl(m[1]);

@@ -12,7 +12,7 @@ Deep-research AI agent web app: social login, usage credits, bring-your-own Open
 - Google / GitHub login (Supabase Auth)
 - Paywall: coupon `SID_DRDROID` or Razorpay → 5 credits (1 credit = 1 agent run)
 - BYO LLM key (AES-GCM at rest) + model catalog with cost estimates
-- Agent tools: `web_search`, `fetch_url`, `image_search`, `think`, `create_pdf_report`
+- Agent tools: `web_search` (SerpAPI → Brave → DDG), `fetch_url`, `image_search`, `think`, `create_pdf_report`
 - PDF reports (pdfkit) stored in private Supabase Storage — **retained 3 days**, **max 10 PDFs / user / day**
 - In-chat progress survives tab close (server persists steps; client polls on return)
 - Usage page: tokens + $ cost by input / output / cache
