@@ -27,6 +27,7 @@ function SettingsInner() {
   const welcome = params.get("welcome") === "1";
 
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [pricingAsOf, setPricingAsOf] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [keyPreview, setKeyPreview] = useState<string | null>(null);
@@ -66,6 +67,7 @@ function SettingsInner() {
       .then((d) => {
         const catalog: ModelInfo[] = d.models ?? [];
         setModels(catalog);
+        if (typeof d.pricingAsOf === "string") setPricingAsOf(d.pricingAsOf);
         if (d.config) {
           setBaseUrl(d.config.baseUrl);
           setKeyPreview(d.config.keyPreview);
@@ -195,7 +197,8 @@ function SettingsInner() {
                 {selected && (
                   <p className="font-mono text-xs text-zinc-500 mt-1.5">
                     Pricing used for cost tracking: ${selected.input}/M input · $
-                    {selected.output}/M output · ${selected.cachedIn}/M cached input.
+                    {selected.output}/M output · ${selected.cachedIn}/M cached input
+                    {pricingAsOf ? ` · rates as of ${pricingAsOf}` : ""}.
                   </p>
                 )}
               </>

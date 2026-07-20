@@ -1,15 +1,23 @@
 import { createSupabaseAdmin } from "@/lib/supabase/server";
 import { renderPdf } from "./pdf-render";
 import type { ToolContext } from "./tools";
+import {
+  ARTIFACT_TTL_DAYS,
+  assertPdfQuota,
+  cleanupExpiredArtifacts,
+} from "@/lib/artifacts";
 
 // Public entry: render markdown -> PDF, upload to the private `artifacts`
-// bucket, record the row, and return a 7-day signed URL. The rendering itself
-// lives in ./pdf-render (import-light, so it can be unit-tested in isolation).
+// bucket, record the row, and return a signed URL (TTL matches artifact retention).
 export async function generatePdfReport(
   title: string,
   markdown: string,
   ctx: ToolContext
 ): Promise<{ id: string; filename: string; url: string }> {
+  // Housekeeping + daily cap (keeps Heroku + Storage stable)
+  void cleanupExpiredArtifacts();
+  await assertPdfQuota(ctx.userId);
+
   const buffer = await renderPdf(title, markdown);
 
   const admin = createSupabaseAdmin();
@@ -30,9 +38,10 @@ export async function generatePdfReport(
     .single();
   if (insErr) throw new Error(`artifact record failed: ${insErr.message}`);
 
+  const ttlSec = ARTIFACT_TTL_DAYS * 24 * 60 * 60;
   const { data: signed, error: signErr } = await admin.storage
     .from("artifacts")
-    .createSignedUrl(storagePath, 60 * 60 * 24 * 7); // 7 days
+    .createSignedUrl(storagePath, ttlSec);
   if (signErr || !signed) throw new Error(`artifact signing failed: ${signErr?.message}`);
 
   return { id: row.id, filename, url: signed.signedUrl };

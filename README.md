@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MicroManus
 
-## Getting Started
+Deep-research AI agent web app: social login, usage credits, bring-your-own OpenAI-compatible API key, think→search→read→report loop, PDF artifacts, cost tracking.
 
-First, run the development server:
+**Live:** https://rushiraj.birajdar.in  
+**Stack:** Next.js 16 · React 19 · Supabase · Razorpay · Heroku · PostHog (optional)
+
+---
+
+## Features
+
+- Google / GitHub login (Supabase Auth)
+- Paywall: coupon `SID_DRDROID` or Razorpay → 5 credits (1 credit = 1 agent run)
+- BYO LLM key (AES-GCM at rest) + model catalog with cost estimates
+- Agent tools: `web_search`, `fetch_url`, `image_search`, `think`, `create_pdf_report`
+- PDF reports (pdfkit) stored in private Supabase Storage — **retained 3 days**, **max 10 PDFs / user / day**
+- In-chat progress survives tab close (server persists steps; client polls on return)
+- Usage page: tokens + $ cost by input / output / cache
+- Reports library, collapsible sidebar, day/night + accent themes
+
+---
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+# fill .env.local (see docs/SETUP-DEPLOY.md)
+npm run dev     # http://localhost:3000
+npm run build   # must pass before deploy
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Node **22.x** required (`package.json` engines).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy (Heroku)
 
-## Learn More
+App name: **`micromanus-sid`**
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+heroku config:set $(grep -v '^#' .env.local | xargs) -a micromanus-sid
+git push https://git.heroku.com/micromanus-sid.git master:main
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Custom domain: `rushiraj.birajdar.in` (CNAME → Heroku DNS target).  
+After domain change, update Supabase **Site URL** + redirect URLs.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Details: [docs/SETUP-DEPLOY.md](./docs/SETUP-DEPLOY.md)
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Docs
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| File | Purpose |
+|---|---|
+| [docs/SETUP-DEPLOY.md](./docs/SETUP-DEPLOY.md) | Env vars, OAuth, domain, Heroku |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | System design |
+| [docs/TESTING.md](./docs/TESTING.md) | Acceptance checklist |
+| [docs/STATUS.md](./docs/STATUS.md) | What’s done / pending |
+| [docs/DESIGN-SYSTEM.md](./docs/DESIGN-SYSTEM.md) | UI language |
+
+---
+
+## Pricing notes
+
+Catalog prices live in `src/lib/models.ts` (`PRICING_AS_OF`).  
+Claude (Anthropic) and GPT (OpenAI) rates are reviewed periodically against public list prices for the Usage page estimates.
+
+---
+
+## License
+
+Private assignment project.

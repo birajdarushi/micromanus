@@ -79,10 +79,11 @@ the UX alive. Revisit only after everything else ships.
   DuckDuckGo HTML fallback (keyless). Returns numbered title/URL/snippet list.
 - `fetch_url(url)` — 15s timeout, http(s) only, SSRF guard (blocks localhost/private
   ranges/.internal), HTML→text strip, 12k char cap.
-- `create_pdf_report(title, markdown)` — `lib/agent/pdf.ts` renders simple markdown
-  (#/##/### , bullets, bold-strip) via pdfkit → uploads to private `artifacts`
-  bucket → inserts `artifacts` row → returns 7-day signed URL. Registered as an SSE
-  `artifact` event and stored on the assistant message for history.
+- `image_search(query)` — Wikimedia Commons direct image URLs for PDF embeds.
+- `think(reflection)` — plan/reflect step (no network).
+- `create_pdf_report(title, markdown)` — `lib/agent/pdf-render.ts` + Storage upload.
+  **Retention: 3 days** (DB + object GC). **Quota: 10 PDFs / user / UTC day.**
+  Signed URL TTL matches retention.
 
 ## Billing
 

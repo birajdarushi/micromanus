@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createSupabaseServer, createSupabaseAdmin } from "@/lib/supabase/server";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
-import { MODELS } from "@/lib/models";
+import { MODELS, PRICING_AS_OF } from "@/lib/models";
 import OpenAI from "openai";
 
 export const runtime = "nodejs";
@@ -34,6 +34,7 @@ export async function GET() {
       ? { baseUrl: cfg.base_url, defaultModel: cfg.default_model, keyPreview }
       : null,
     models: MODELS,
+    pricingAsOf: PRICING_AS_OF,
   });
 }
 

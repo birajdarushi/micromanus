@@ -57,6 +57,8 @@ interface Msg {
   text: string;
   steps?: Step[];
   artifacts?: Artifact[];
+  /** "running" while the server is still researching (survives tab close). */
+  status?: "running" | "done" | "error";
 }
 
 interface AgentEvent {
@@ -591,6 +593,9 @@ export default function ChatWindow({ initialChatId }: { initialChatId?: string }
   const [model, setModel] = useState("");
   const [models, setModels] = useState<ModelOption[]>([]);
   const [savingModel, setSavingModel] = useState(false);
+  /** True when we reopened a chat whose run is still finishing server-side. */
+  const [resumeMode, setResumeMode] = useState(false);
+  const sseActiveRef = useRef(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -653,26 +658,120 @@ export default function ChatWindow({ initialChatId }: { initialChatId?: string }
       .then((r) => r.json())
       .then((d) => {
         setModel(d.chat?.model ?? "");
-        setMessages(
-          (d.messages ?? [])
-            .filter((m: { role: string }) => m.role === "user" || m.role === "assistant")
-            .map(
-              (m: {
-                id: string;
-                role: "user" | "assistant";
-                content: { text?: string; steps?: Step[]; artifacts?: Artifact[] };
-              }) => ({
+        const mapped: Msg[] = (d.messages ?? [])
+          .filter((m: { role: string }) => m.role === "user" || m.role === "assistant")
+          .map(
+            (m: {
+              id: string;
+              role: "user" | "assistant";
+              content: {
+                text?: string;
+                steps?: Step[];
+                artifacts?: Artifact[];
+                status?: "running" | "done" | "error";
+              };
+            }) => {
+              const st = m.content?.status;
+              const steps: Step[] = (m.content?.steps ?? []).map((s, i, arr) => ({
+                ...s,
+                status:
+                  st === "running" && i === arr.length - 1
+                    ? ("running" as const)
+                    : ("done" as const),
+              }));
+              return {
                 id: m.id,
                 role: m.role,
                 text: m.content?.text ?? "",
-                steps: m.content?.steps?.map((s) => ({ ...s, status: "done" as const })),
+                steps,
                 artifacts: m.content?.artifacts,
-              })
-            )
-        );
+                status: st,
+              };
+            }
+          );
+        setMessages(mapped);
+
+        // Rejoin an in-flight server run after tab close / navigation away
+        const last = [...mapped].reverse().find((m) => m.role === "assistant");
+        if (last?.status === "running" && !sseActiveRef.current) {
+          setRunning(true);
+          setResumeMode(true);
+          setStatus("Research still running — reconnecting…");
+          setLiveSteps(last.steps ?? []);
+          setLiveArtifacts(last.artifacts ?? []);
+        }
       })
       .catch(() => {});
   }, [chatId]);
+
+  // Poll DB while a run continues after the SSE connection was lost
+  useEffect(() => {
+    if (!chatId || !resumeMode || sseActiveRef.current) return;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/chats/${chatId}`);
+        const d = await r.json();
+        const rows = (d.messages ?? []).filter(
+          (m: { role: string }) => m.role === "user" || m.role === "assistant"
+        );
+        const last = [...rows].reverse().find((m: { role: string }) => m.role === "assistant");
+        if (!last) return;
+        const content = last.content as {
+          text?: string;
+          steps?: Step[];
+          artifacts?: Artifact[];
+          status?: string;
+        };
+        const steps = (content.steps ?? []).map((s, i, arr) => ({
+          ...s,
+          status:
+            content.status === "running" && i === arr.length - 1
+              ? ("running" as const)
+              : ("done" as const),
+        }));
+        setLiveSteps(steps);
+        setLiveArtifacts(content.artifacts ?? []);
+
+        if (content.status === "done") {
+          setMessages((prev) => {
+            const withoutRunning = prev.filter((m) => m.status !== "running");
+            return [
+              ...withoutRunning,
+              {
+                id: last.id,
+                role: "assistant" as const,
+                text: content.text ?? "",
+                steps: steps.map((s) => ({ ...s, status: "done" as const })),
+                artifacts: content.artifacts,
+                status: "done" as const,
+              },
+            ];
+          });
+          setLiveSteps([]);
+          setLiveArtifacts([]);
+          setStatus(null);
+          setRunning(false);
+          setResumeMode(false);
+          window.dispatchEvent(new Event("mm:refresh"));
+          playDoneChime();
+          toast.success("Research complete");
+        } else if (content.status === "error") {
+          setError(content.text || "Research failed");
+          setLiveSteps([]);
+          setRunning(false);
+          setResumeMode(false);
+          setStatus(null);
+        } else {
+          setStatus("Research still running…");
+        }
+      } catch {
+        /* ignore transient poll errors */
+      }
+    };
+    void tick();
+    const id = window.setInterval(tick, 2500);
+    return () => window.clearInterval(id);
+  }, [chatId, resumeMode]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -690,6 +789,8 @@ export default function ChatWindow({ initialChatId }: { initialChatId?: string }
     setInput("");
     setError(null);
     setRunning(true);
+    setResumeMode(false);
+    sseActiveRef.current = true;
     setStatus("Starting agent…");
     setLiveSteps([]);
     setLiveArtifacts([]);
@@ -810,6 +911,7 @@ export default function ChatWindow({ initialChatId }: { initialChatId?: string }
       window.dispatchEvent(new Event("mm:refresh"));
       captureEvent("agent_run_error", { message: message.slice(0, 80) });
     } finally {
+      sseActiveRef.current = false;
       setRunning(false);
     }
   }

@@ -47,6 +47,7 @@ Quality bar:
 
 PDF reports:
 - If the user asks for a "report", "PDF", "document", "write-up", or to expand a previous report, you MUST call create_pdf_report.
+- Soft limit: at most 10 PDFs per user per UTC day (enforced by the tool). Prefer one solid report over many tiny ones.
 - Follow-ups that add material → regenerate the FULL updated report and call create_pdf_report again.
 - Renderer supports: #/##/###, bullets, numbered lists, tables, > blockquotes, **bold**/*italic*/\`code\`, [text](url), ---, ![caption](image-url).
 - Rules:
@@ -182,7 +183,10 @@ export async function POST(req: NextRequest) {
   // then persisted turns, then the new user message.
   const messages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
   for (const m of history ?? []) {
-    const text = (m.content as { text?: string })?.text ?? "";
+    const c = m.content as { text?: string; status?: string };
+    // skip in-flight progress rows (empty text / running) — not model turns
+    if (c?.status === "running") continue;
+    const text = c?.text ?? "";
     if (!text) continue;
     if (m.role === "user") messages.push({ role: "user", content: text });
     else if (m.role === "assistant") messages.push({ role: "assistant", content: text });
@@ -193,13 +197,45 @@ export async function POST(req: NextRequest) {
   const steps: Array<{ tool: string; args: unknown; summary: string }> = [];
   const artifacts: Array<{ id: string; filename: string; url: string }> = [];
 
+  // Progress row so a user who closes the tab can reopen the chat and still see
+  // live steps until the run finishes (server keeps working either way).
+  const { data: progressRow } = await admin
+    .from("messages")
+    .insert({
+      chat_id: chatId,
+      user_id: user.id,
+      role: "assistant",
+      content: { text: "", steps: [], artifacts: [], status: "running" },
+    })
+    .select("id")
+    .single();
+  const progressId: string | null = progressRow?.id ?? null;
+
+  const persistProgress = async (patch: {
+    text?: string;
+    status: "running" | "done" | "error";
+  }) => {
+    if (!progressId) return;
+    await admin
+      .from("messages")
+      .update({
+        content: {
+          text: patch.text ?? "",
+          steps,
+          artifacts,
+          status: patch.status,
+        },
+      })
+      .eq("id", progressId);
+  };
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (e: Record<string, unknown>) => {
         try {
           controller.enqueue(sseEncode(e));
         } catch {
-          /* client disconnected */
+          /* client disconnected — run continues, progress is in DB */
         }
       };
       // heartbeat: keep Heroku's 55s idle window open during long LLM calls
@@ -246,6 +282,7 @@ export async function POST(req: NextRequest) {
       let finalText = "";
       try {
         send({ type: "status", text: "Thinking…" });
+        await persistProgress({ status: "running" });
 
         for (let i = 0; i < MAX_ITERATIONS; i++) {
           const completion = await callModel();
@@ -296,6 +333,7 @@ export async function POST(req: NextRequest) {
                   : outcome.result;
               steps.push({ tool: tc.function.name, args, summary });
               send({ type: "tool_result", tool: tc.function.name, summary });
+              await persistProgress({ status: "running" });
 
               messages.push({
                 role: "tool",
@@ -315,14 +353,23 @@ export async function POST(req: NextRequest) {
             "I ran out of research steps before finishing. Here is what I gathered so far — please ask me to continue.";
         }
 
-        // persist assistant turn + usage/cost
+        // finalize progress row + usage/cost
         const cost = computeCost(model, totals);
-        await admin.from("messages").insert({
-          chat_id: chatId,
-          user_id: user.id,
-          role: "assistant",
-          content: { text: finalText, steps, artifacts },
-        });
+        if (progressId) {
+          await admin
+            .from("messages")
+            .update({
+              content: { text: finalText, steps, artifacts, status: "done" },
+            })
+            .eq("id", progressId);
+        } else {
+          await admin.from("messages").insert({
+            chat_id: chatId,
+            user_id: user.id,
+            role: "assistant",
+            content: { text: finalText, steps, artifacts, status: "done" },
+          });
+        }
         await admin.from("usage_events").insert({
           user_id: user.id,
           chat_id: chatId,
@@ -362,6 +409,7 @@ export async function POST(req: NextRequest) {
         if (!finalText) {
           await admin.rpc("consume_credit", { p_user_id: user.id, p_amount: -1 });
         }
+        await persistProgress({ text: message, status: "error" });
         send({ type: "error", message });
       } finally {
         clearInterval(heartbeat);
