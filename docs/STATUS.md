@@ -161,7 +161,7 @@ URL `https://oqavfibixcidikoadmge.supabase.co`. Remaining path to a live app:
    env and `next start` respects it; verify `package.json` start script is `next start`).
 8. **End-to-end smoke test** with owner's OpenRouter free-model key + Gemini key
    (TESTING.md checklist), then friend-test, then email URL to Siddarth.
-9. **Commit + push to GitHub** — remember `Co-Authored-By: Claude Fable 5` trailer;
+9. **Commit + push to GitHub** — use your own git identity; never commit secrets;
    NEVER commit `razorx.env`/`.env.local` (already gitignored — verify with `git status`).
 
 ## Known gaps / risks / decisions on record
