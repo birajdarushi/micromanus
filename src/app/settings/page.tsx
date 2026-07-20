@@ -8,6 +8,7 @@ import AppShell from "@/components/AppShell";
 import Mascot from "@/components/Mascot";
 import Dropdown, { type DropdownOption } from "@/components/Dropdown";
 import AccentPicker from "@/components/AccentPicker";
+import { captureEvent } from "@/components/PostHogProvider";
 
 interface ModelInfo {
   id: string;
@@ -51,6 +52,7 @@ function SettingsInner() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Invalid code");
+      captureEvent("promo_code_redeemed", { credits_granted: d.creditsGranted ?? 5 });
       toast.success(`${d.creditsGranted ?? 5} credits added`);
       setPromo("");
       window.dispatchEvent(new Event("mm:refresh"));
@@ -110,6 +112,7 @@ function SettingsInner() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
+      captureEvent("api_key_saved", { model: effectiveModel });
       toast.success("Saved. You're ready to research.");
       setApiKey("");
       if (welcome) setTimeout(() => router.push("/chat"), 900);

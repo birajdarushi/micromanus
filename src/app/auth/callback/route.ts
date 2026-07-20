@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { sendWelcomeEmail, sendAdminSignupNotify } from "@/lib/mail";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,17 @@ export async function GET(req: NextRequest) {
           sendWelcomeEmail(user.email, name),
           sendAdminSignupNotify(user.email),
         ]);
+        const posthog = getPostHogClient();
+        posthog.capture({
+          distinctId: user.id,
+          event: "user_signed_up",
+          properties: { provider: user.app_metadata?.provider ?? "unknown" },
+        });
+        posthog.identify({
+          distinctId: user.id,
+          properties: { email: user.email, name: name ?? undefined },
+        });
+        await posthog.flush();
       }
 
       const { data: profile } = await supabase

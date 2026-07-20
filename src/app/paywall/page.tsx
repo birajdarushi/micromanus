@@ -6,6 +6,7 @@ import Script from "next/script";
 import { toast } from "sonner";
 import { CreditCard, Ticket } from "lucide-react";
 import Mascot from "@/components/Mascot";
+import { captureEvent } from "@/components/PostHogProvider";
 
 interface RazorpayResponse {
   razorpay_order_id: string;
@@ -37,6 +38,7 @@ export default function PaywallPage() {
         if (d.user?.email) setEmail(d.user.email);
       })
       .catch(() => {});
+    captureEvent("paywall_viewed");
   }, [router]);
 
   function unlocked(msg: string) {
@@ -56,6 +58,7 @@ export default function PaywallPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Coupon failed");
+      captureEvent("coupon_redeemed", { credits_granted: data.creditsGranted });
       unlocked(`Coupon accepted — ${data.creditsGranted} credits added`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Coupon failed");
@@ -66,6 +69,7 @@ export default function PaywallPage() {
 
   async function payWithCard() {
     setBusy("pay");
+    captureEvent("payment_initiated");
     try {
       const res = await fetch("/api/billing/order", { method: "POST" });
       const data = await res.json();
@@ -89,6 +93,7 @@ export default function PaywallPage() {
             });
             const vd = await v.json();
             if (!v.ok) throw new Error(vd.error ?? "Verification failed");
+            captureEvent("payment_completed", { credits_granted: vd.creditsGranted ?? 5 });
             unlocked(`Payment verified — ${vd.creditsGranted ?? 5} credits added`);
           } catch (err) {
             toast.error(err instanceof Error ? err.message : "Verification failed");

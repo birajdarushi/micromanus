@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import Razorpay from "razorpay";
 import { createSupabaseServer, createSupabaseAdmin } from "@/lib/supabase/server";
 import { CREDITS_PER_UNLOCK, MAX_CREDITS } from "@/lib/billing";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export const runtime = "nodejs";
 
@@ -84,6 +85,14 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
+
+  const posthog = getPostHogClient();
+  posthog.capture({
+    distinctId: user.id,
+    event: "payment_verified",
+    properties: { credits_granted: granted, order_id: orderId },
+  });
+  await posthog.flush();
 
   return Response.json({ ok: true, creditsGranted: granted });
 }

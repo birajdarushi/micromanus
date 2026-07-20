@@ -256,6 +256,7 @@ function ArtifactCardPDF({ artifact }: { artifact: Artifact }) {
         rel="noreferrer"
         download
         data-testid="artifact-download"
+        onClick={() => captureEvent("pdf_report_downloaded", { filename: artifact.filename })}
         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 text-zinc-50 px-3 py-1.5 text-xs font-medium hover:bg-zinc-800 transition-colors focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:outline-none"
       >
         <ArrowDownToLine size={14} strokeWidth={1.5} />
