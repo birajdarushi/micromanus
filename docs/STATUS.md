@@ -1,6 +1,16 @@
 # STATUS — single source of truth (update this file every session)
 
-_Last updated: 2026-07-20 (session 3 — Supabase provisioned + hardened; usage page + custom-model escape hatch; full DESIGN-SYSTEM.md redesign; live-testing bug-fix + UX batch; build green)._
+_Last updated: 2026-07-20 (session 5 — notifications/bg banner, image_search, PostHog, welcome email, agent prompt; build green. See SESSION-5-HANDOFF.md)._
+
+## Session 5 — remaining enhancements (build-verified)
+
+- ✅ **Track C:** reliable completion notifications + “research in progress” strip + “finished while away” banner (`lib/notify.ts`, ChatWindow).
+- ✅ **image_search** tool (Wikimedia Commons) + system-prompt rules; PDF renderer already embeds images.
+- ✅ **Agent loop** prompt: plan → multi-search → read → reflect → synthesize.
+- ✅ **PostHog** (ClickHouse-backed) env-gated client analytics; identify user; agent run events.
+- ✅ **Welcome HTML email + admin signup notify** via Gmail SMTP (env-gated; auth callback).
+- ⏳ **Deploy** still pending; large uncommitted tree since `724f12f`.
+- ⏳ Owner must paste optional: `NEXT_PUBLIC_POSTHOG_KEY`, `GMAIL_USER`/`GMAIL_APP_PASSWORD`, recommended `BRAVE_SEARCH_API_KEY`.
 
 ## Session 3b — live testing fixes & UX (all built + build-verified)
 - **Own SVG mascots** (`components/Mascot.tsx`) — hand-drawn animated glow-blobs (float/blink/glow + per-state accessory: gear spins, globe rotates, dots twinkle, bars pulse). Replaced the PNG sprite system; old sliced PNGs deleted. Persistent animated avatar now sits next to each answer; the live avatar cycles tool-states.

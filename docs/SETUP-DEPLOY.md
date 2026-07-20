@@ -18,6 +18,16 @@ COUPON_CODE=SID_DRDROID
 PAYWALL_CURRENCY=INR                      # or USD (amount 500)
 PAYWALL_AMOUNT=42500
 BRAVE_SEARCH_API_KEY=                     # optional but recommended (free tier)
+
+# --- optional: product analytics (PostHog; stores events in ClickHouse) ---
+NEXT_PUBLIC_POSTHOG_KEY=                  # Project API key from PostHog
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com   # or https://eu.i.posthog.com
+
+# --- optional: welcome email + admin signup ping via Gmail SMTP ---
+GMAIL_USER=                               # e.g. you@gmail.com
+GMAIL_APP_PASSWORD=                       # Google App Password (not account password)
+ADMIN_NOTIFY_EMAIL=                       # defaults to GMAIL_USER if unset
+NEXT_PUBLIC_APP_URL=https://micromanus-sid-8b56d69b5666.herokuapp.com
 ```
 
 ## 1. Supabase provisioning

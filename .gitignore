@@ -48,3 +48,10 @@ razorx.env
 # supabase CLI temp
 supabase/.temp/
 emergent styles
+
+# local research references (cloned for agent inspiration — not shipped)
+/reference/
+
+# local browser/test artifacts
+.playwright-mcp/
+Testing and final enhacemnts before deploy.txt
