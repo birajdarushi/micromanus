@@ -68,7 +68,7 @@ URL `https://oqavfibixcidikoadmge.supabase.co`. Remaining path to a live app:
 - First commit made (`511cba9`, root commit on `master` — note: branch is `master`, not `main`).
 - `.env.local` created (gitignored) with Razorpay keys + generated `APP_ENCRYPTION_KEY` filled in;
   `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` still **blank** — Supabase MCP is
-  not yet authenticated in this session (owner must run `claude /mcp`), so these can't be fetched
+  not yet authenticated in this session (owner must authenticate the Supabase MCP), so these can't be fetched
   yet. **Not pushed to Heroku yet** — proxy.ts reads the Supabase URL/anon key on every request
   (middleware), so deploying now would 500 on every route until those two keys are set.
 
@@ -148,7 +148,7 @@ URL `https://oqavfibixcidikoadmge.supabase.co`. Remaining path to a live app:
 4. **Verify `npm run build` passes** — never yet run. Expect possible issues:
    `proxy.ts` naming (Next 16 uses proxy.ts — verify export shape), tailwind v4
    class usage, ESLint strictness. Fix until clean.
-5. **Provision Supabase** (task #4): owner must run `claude /mcp` → authenticate;
+5. **Provision Supabase** (task #4): owner must authenticate the Supabase MCP → authenticate;
    then apply `0001_init.sql` via MCP `apply_migration`; enable Google+GitHub providers
    (needs OAuth client ids — see SETUP-DEPLOY.md); set Site URL + redirect URLs to the
    Heroku domain; get anon key; owner pastes `SUPABASE_SERVICE_ROLE_KEY` into `.env.local`.
@@ -190,7 +190,7 @@ URL `https://oqavfibixcidikoadmge.supabase.co`. Remaining path to a live app:
 
 ## Owner (human) action items — ask when needed
 
-- [ ] Run `claude /mcp` → authenticate Supabase MCP (needed before migrations).
+- [ ] Run `authenticate the Supabase MCP` → authenticate Supabase MCP (needed before migrations).
 - [ ] Paste `SUPABASE_SERVICE_ROLE_KEY` (+ anon key if MCP can't fetch) into `.env.local`.
 - [ ] Create Google OAuth client + GitHub OAuth app (callback:
       `https://oqavfibixcidikoadmge.supabase.co/auth/v1/callback`) and enter them in

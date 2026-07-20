@@ -33,7 +33,7 @@ NEXT_PUBLIC_APP_URL=https://micromanus-sid-8b56d69b5666.herokuapp.com
 ## 1. Supabase provisioning
 
 MCP is configured in `.mcp.json` (project ref `oqavfibixcidikoadmge`). One-time:
-owner runs `claude /mcp` in a plain terminal → select `supabase` → Authenticate.
+owner runs `authenticate the Supabase MCP` in a plain terminal → select `supabase` → Authenticate.
 
 Then, via MCP tools:
 1. `apply_migration` with `supabase/migrations/0001_init.sql` (idempotent — safe to re-run).
@@ -94,5 +94,4 @@ Run TESTING.md end-to-end on the live URL, then have a friend run it cold.
 - Remote: `git@github.com:birajdarushi/micromanus.git`; repo-local user already set
   (`birajdarushi` / `birajdarushi@users.noreply.github.com`).
 - Before every commit: `git status` — `razorx.env` and `.env.local` must NOT appear.
-- Commit trailer (required):
-  `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`
+- Commits: use your GitHub identity (`birajdarushi`). Never commit secrets.

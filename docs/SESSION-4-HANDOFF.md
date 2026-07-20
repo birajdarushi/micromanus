@@ -104,11 +104,6 @@ Suggested commits (logical grouping):
 4. `feat(ui): collapsible sidebar, timestamps, inline rename, reports library`
 5. `feat(billing): variable credit top-up (server-authoritative) + promo + accent picker + favicon`
 
-Remember the trailers (from repo conventions):
-```
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01CZG9zA3D4SF4phWn91qCSL
-```
 Branch is `master`; push `master:main` to Heroku when deploying.
 
 ---

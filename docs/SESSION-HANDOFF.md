@@ -109,12 +109,7 @@ All 16 requirements **code-complete** and build-verified; end-to-end tested loca
 - globals.css: mascot hover scale.
 - agent route: strengthened research prompt.
 
-**Next session: commit this batch.** Build is green; dev server verified. Suggested message continues the session-3 theme. Remember trailers:
-```
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01CZG9zA3D4SF4phWn91qCSL
-```
-
+**Next session: commit this batch.** Build is green; dev server verified. Suggested message continues the session-3 theme. 
 ---
 
 ## 6. Architecture & key decisions (gotchas)

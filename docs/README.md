@@ -37,7 +37,7 @@ friend test everything before sending.**
   `birajdarushi` (already configured via `git config`, do not use global identity).
 - **Deploy target**: Heroku (user has credits; Heroku CLI is logged in and active).
 - **Supabase project ref**: `oqavfibixcidikoadmge` (MCP configured in `.mcp.json`,
-  needs one-time `claude /mcp` authentication in a terminal).
+  needs one-time `authenticate the Supabase MCP` authentication in a terminal).
 - **Razorpay test keys**: in `razorx.env` at repo root (gitignored — never commit).
   key_id `rzp_test_TFTsAum4wSHStl`.
 - **Coupon code**: `SID_DRDROID` (also via `COUPON_CODE` env).
