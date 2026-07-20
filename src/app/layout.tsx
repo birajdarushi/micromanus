@@ -15,16 +15,21 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains",
 });
 
+// Cache-busted brand icons only (no unversioned /favicon.ico — browsers stick to
+// the old create-next-app triangle forever if that path is ever served).
+const ICON_V = "mm3";
+
 export const metadata: Metadata = {
   title: "MicroManus — Deep Research Agent",
   description:
     "A deep research AI agent with web search, PDF reports, and usage-based billing.",
   icons: {
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "any" },
+      { url: `/mm-icon.svg?v=${ICON_V}`, type: "image/svg+xml" },
+      { url: `/mm-favicon.ico?v=${ICON_V}`, sizes: "any" },
     ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+    shortcut: `/mm-favicon.ico?v=${ICON_V}`,
+    apple: [{ url: `/mm-apple-icon.png?v=${ICON_V}`, sizes: "180x180" }],
   },
 };
 

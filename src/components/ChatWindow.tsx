@@ -115,14 +115,26 @@ function stepLabel(s: Step): string {
 }
 
 // The signature AgentThinkingLoop — a vertical timeline of Think → Tool → Observe.
-// Collapsible so it doesn't take over the page: a compact chip that expands.
+// Outer chip collapses the whole loop; each step's observation expands inline
+// (click the step row — no modal).
 function ThinkingLoop({ steps, defaultOpen = false }: { steps: Step[]; defaultOpen?: boolean }) {
-  const running = steps.some((s) => s.status === "running");
-  const [open, setOpen] = useState(defaultOpen || running);
+  const anyRunning = steps.some((s) => s.status === "running");
+  const [open, setOpen] = useState(defaultOpen || anyRunning);
+  // which step observations are expanded (by index)
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    if (defaultOpen || anyRunning) setOpen(true);
+  }, [defaultOpen, anyRunning, steps.length]);
+
   if (!steps.length) return null;
-  const summary = running
+  const summary = anyRunning
     ? "Researching…"
     : `Researched · ${steps.length} step${steps.length > 1 ? "s" : ""}`;
+
+  const toggleObs = (i: number) =>
+    setExpanded((prev) => ({ ...prev, [i]: !prev[i] }));
+
   return (
     <div className="mb-2">
       <button
@@ -131,7 +143,7 @@ function ThinkingLoop({ steps, defaultOpen = false }: { steps: Step[]; defaultOp
         data-testid="thinking-toggle"
         className="flex items-center gap-2 w-fit rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
       >
-        <Brain size={13} strokeWidth={1.5} className={running ? "text-accent-400" : "text-zinc-500"} />
+        <Brain size={13} strokeWidth={1.5} className={anyRunning ? "text-accent-400" : "text-zinc-500"} />
         {summary}
         <ChevronRight
           size={13}
@@ -142,47 +154,80 @@ function ThinkingLoop({ steps, defaultOpen = false }: { steps: Step[]; defaultOp
       {open && (
         <div className="ml-4 mt-2 flex flex-col gap-3 border-l-2 border-zinc-800 pl-4 py-2 font-mono text-sm">
           {steps.map((s, i) => {
-        const Icon = stepIcon[s.tool] ?? Wrench;
-        const running = s.status === "running";
-        return (
-          <div
-            key={i}
-            className={`relative ${
-              running
-                ? "before:content-[''] before:absolute before:-left-[25px] before:top-1 before:w-4 before:h-4 before:bg-accent-400/20 before:rounded-full before:animate-ping"
-                : ""
-            }`}
-          >
-            <span
-              className={`absolute -left-[22px] top-1.5 w-2 h-2 rounded-full ${
-                running ? "bg-accent-400" : "bg-zinc-700"
-              }`}
-            />
-            <div className="flex items-center gap-2">
-              <Icon
-                size={14}
-                strokeWidth={1.5}
-                className={running ? "text-accent-400" : "text-zinc-500"}
-              />
-              <span className={running ? "text-zinc-200" : "text-zinc-400"}>
-                {stepLabel(s)}
-              </span>
-              {running ? (
-                <Loader2 size={13} strokeWidth={1.5} className="text-accent-400 animate-spin" />
-              ) : (
-                <Check size={13} strokeWidth={2} className="text-emerald-500" />
-              )}
-            </div>
-            {s.summary && (
-              <details className="mt-1 group">
-                <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-400 select-none">
-                  observation
-                </summary>
-                <div className="mt-1 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 whitespace-pre-wrap">
-                  {s.summary}
-                </div>
-              </details>
-            )}
+            const Icon = stepIcon[s.tool] ?? Wrench;
+            const running = s.status === "running";
+            const hasObs = Boolean(s.summary);
+            const isOpen = Boolean(expanded[i]);
+            const preview = (s.summary ?? "").split("\n").find((l) => l.trim())?.slice(0, 90);
+            return (
+              <div
+                key={i}
+                className={`relative ${
+                  running
+                    ? "before:content-[''] before:absolute before:-left-[25px] before:top-1 before:w-4 before:h-4 before:bg-accent-400/20 before:rounded-full before:animate-ping"
+                    : ""
+                }`}
+              >
+                <span
+                  className={`absolute -left-[22px] top-1.5 w-2 h-2 rounded-full ${
+                    running ? "bg-accent-400" : "bg-zinc-700"
+                  }`}
+                />
+                <button
+                  type="button"
+                  disabled={!hasObs}
+                  onClick={() => hasObs && toggleObs(i)}
+                  onDoubleClick={() => hasObs && toggleObs(i)}
+                  data-testid="observation-toggle"
+                  className={`w-full text-left rounded-md px-1 -mx-1 py-0.5 transition-colors ${
+                    hasObs
+                      ? "cursor-pointer hover:bg-zinc-900/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent-500"
+                      : "cursor-default"
+                  }`}
+                  aria-expanded={hasObs ? isOpen : undefined}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon
+                      size={14}
+                      strokeWidth={1.5}
+                      className={running ? "text-accent-400 shrink-0" : "text-zinc-500 shrink-0"}
+                    />
+                    <span
+                      className={`truncate ${running ? "text-zinc-200" : "text-zinc-400"}`}
+                    >
+                      {stepLabel(s)}
+                    </span>
+                    {running ? (
+                      <Loader2
+                        size={13}
+                        strokeWidth={1.5}
+                        className="text-accent-400 animate-spin shrink-0"
+                      />
+                    ) : (
+                      <Check size={13} strokeWidth={2} className="text-emerald-500 shrink-0" />
+                    )}
+                    {hasObs && (
+                      <ChevronRight
+                        size={13}
+                        strokeWidth={1.5}
+                        className={`ml-auto shrink-0 text-zinc-600 transition-transform ${
+                          isOpen ? "rotate-90" : ""
+                        }`}
+                      />
+                    )}
+                  </div>
+                  {hasObs && !isOpen && preview && (
+                    <p className="mt-1 pl-5 text-[11px] text-zinc-600 truncate">{preview}…</p>
+                  )}
+                </button>
+                {hasObs && isOpen && (
+                  <div
+                    data-testid="observation-body"
+                    className="mt-1.5 ml-5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-xs text-zinc-400 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"
+                  >
+                    {s.summary}
+                  </div>
+                )}
               </div>
             );
           })}
