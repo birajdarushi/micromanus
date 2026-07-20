@@ -1,4 +1,4 @@
-// Agent tool implementations: web search (Brave), URL fetch, PDF report artifact.
+// Agent tool implementations: web search (Brave), URL fetch, image search, PDF report.
 import type OpenAI from "openai";
 import { generatePdfReport } from "./pdf";
 
@@ -37,9 +37,44 @@ export const TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "image_search",
+      description:
+        "Search Wikimedia Commons for freely-licensed images. Returns direct image URLs safe to embed with ![caption](url) in a PDF report. Use whenever the user asks to include images, photos, diagrams, or illustrations.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "What to find (be specific: subject + context)" },
+          count: { type: "number", description: "Number of images (1-6), default 4" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "think",
+      description:
+        "Reflect and plan next steps (no web access). Call after searches/reads to assess what you found, what's missing, and what to do next. Do not call in parallel with other tools.",
+      parameters: {
+        type: "object",
+        properties: {
+          reflection: {
+            type: "string",
+            description:
+              "What you learned, what's still missing, and the next action (search more / read / write answer / PDF).",
+          },
+        },
+        required: ["reflection"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "create_pdf_report",
       description:
-        "Generate a downloadable PDF report artifact for the user. Use when the user asks for a report/document. Provide a title and full markdown content (headings with #, ## and bullet lists with - are supported).",
+        "Generate a downloadable PDF report artifact for the user. Use when the user asks for a report/document. Provide a title and full markdown content (headings with #, ## and bullet lists with - are supported). Images: use ![caption](direct-image-url) from image_search results.",
       parameters: {
         type: "object",
         properties: {
@@ -73,6 +108,16 @@ export async function executeTool(
         return { result: await webSearch(String(args.query ?? ""), Number(args.count ?? 6)) };
       case "fetch_url":
         return { result: await fetchUrl(String(args.url ?? "")) };
+      case "image_search":
+        return { result: await imageSearch(String(args.query ?? ""), Number(args.count ?? 4)) };
+      case "think": {
+        const reflection = String(args.reflection ?? "").trim();
+        return {
+          result: reflection
+            ? `Noted. Continue with your plan:\n${reflection}`
+            : "Empty reflection — note findings and decide the next tool call.",
+        };
+      }
       case "create_pdf_report": {
         const artifact = await generatePdfReport(
           String(args.title ?? "Report"),
@@ -146,6 +191,95 @@ function stripTags(s: string): string {
     .replace(/&#x27;/g, "'")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Wikimedia Commons image search — keyless, license-clean direct thumb URLs. */
+async function imageSearch(query: string, count: number): Promise<string> {
+  if (!query.trim()) return "Error: empty query";
+  const n = Math.min(Math.max(count || 4, 1), 6);
+  // Prefer standard thumb widths Wikimedia accepts (non-standard e.g. 480px → 400).
+  const width = 640;
+  const params = new URLSearchParams({
+    action: "query",
+    format: "json",
+    origin: "*",
+    generator: "search",
+    gsrsearch: query,
+    gsrnamespace: "6", // File:
+    gsrlimit: String(n),
+    prop: "imageinfo",
+    iiprop: "url|mime|extmetadata|size",
+    iiurlwidth: String(width),
+  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const res = await fetch(`https://commons.wikimedia.org/w/api.php?${params}`, {
+      signal: controller.signal,
+      headers: { "User-Agent": "MicroManusResearchBot/1.0 (deep research agent; educational)" },
+    });
+    if (!res.ok) return `Image search failed: HTTP ${res.status}`;
+    const data = await res.json();
+    type Info = {
+      thumburl?: string;
+      url?: string;
+      mime?: string;
+      extmetadata?: {
+        ImageDescription?: { value?: string };
+        Artist?: { value?: string };
+        LicenseShortName?: { value?: string };
+      };
+    };
+    const pages: Record<string, { title?: string; imageinfo?: Info[] }> = data?.query?.pages ?? {};
+    const rows = Object.values(pages)
+      .map((p) => {
+        const info = p.imageinfo?.[0];
+        if (!info) return null;
+        const mime = info.mime ?? "";
+        if (mime && !mime.startsWith("image/")) return null;
+        const direct = info.thumburl || info.url;
+        if (!direct) return null;
+        const title = (p.title ?? "Image").replace(/^File:/, "");
+        const desc = stripTags(info.extmetadata?.ImageDescription?.value ?? "").slice(0, 160);
+        const license = info.extmetadata?.LicenseShortName?.value ?? "see Commons";
+        const artist = stripTags(info.extmetadata?.Artist?.value ?? "").slice(0, 80);
+        return {
+          title,
+          url: direct,
+          desc,
+          license,
+          artist,
+        };
+      })
+      .filter(Boolean) as Array<{
+      title: string;
+      url: string;
+      desc: string;
+      license: string;
+      artist: string;
+    }>;
+
+    if (!rows.length) {
+      return "No images found. Try a simpler query (e.g. subject + year) or a proper name.";
+    }
+
+    return (
+      `Found ${rows.length} Wikimedia Commons image(s). Embed in the PDF as ![short caption](url) using the Direct URL exactly:\n\n` +
+      rows
+        .map(
+          (r, i) =>
+            `${i + 1}. ${r.title}\n` +
+            `   Direct URL: ${r.url}\n` +
+            `   Caption hint: ${r.desc || r.title}\n` +
+            `   Credit: ${r.artist || "Wikimedia Commons"} · ${r.license}`
+        )
+        .join("\n\n")
+    );
+  } catch (e) {
+    return `Image search failed: ${e instanceof Error ? e.message : String(e)}`;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 const MAX_PAGE_CHARS = 12_000;
