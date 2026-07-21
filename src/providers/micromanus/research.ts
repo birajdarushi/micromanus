@@ -218,11 +218,26 @@ export async function runAgentTurn(
     content: { text: userText },
   });
 
+  // First user message: set a human title only if this is not a gateway lane
+  // (gateway chats use stable titles like "gw:<hash>" for Discord/WA continuity).
   if ((history?.length ?? 0) === 0) {
-    await admin
+    const { data: chatRow } = await admin
       .from("chats")
-      .update({ title: userText.slice(0, 60), updated_at: new Date().toISOString() })
-      .eq("id", chatId);
+      .select("title")
+      .eq("id", chatId)
+      .single();
+    const isGatewayLane = (chatRow?.title ?? "").startsWith("gw:");
+    if (!isGatewayLane) {
+      await admin
+        .from("chats")
+        .update({ title: userText.slice(0, 60), updated_at: new Date().toISOString() })
+        .eq("id", chatId);
+    } else {
+      await admin
+        .from("chats")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", chatId);
+    }
   } else {
     await admin.from("chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
   }
