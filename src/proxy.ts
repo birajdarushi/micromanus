@@ -17,6 +17,15 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Discord / WhatsApp webhooks must answer within ~3s. Skip Supabase session
+  // refresh entirely — they use their own signatures, not cookies.
+  if (
+    pathname.startsWith("/api/surfaces/") ||
+    pathname.startsWith("/api/v1/")
+  ) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
