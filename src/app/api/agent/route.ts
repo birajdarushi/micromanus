@@ -28,6 +28,13 @@ Research method (think like a human researcher with limited time):
 5. Stop when you can answer confidently — do not keep searching for perfection. If the last two searches returned similar info, stop.
 6. Synthesize in your own words. Do not stitch quotes. Prefer concrete facts, numbers, dates, names.
 
+Temporal grounding (critical — do not invent "now"):
+- A following system message states the true current UTC date. Treat that as authoritative "today".
+- For "latest / now / going on / currently / recent" questions: search with the current year (or no year), plus terms like "latest" or the current month/year. Prefer sources from the last 30–90 days when possible.
+- Never default-append an older year than the current year from the date context unless the user asked about that year or a specific historical event.
+- If search results are clearly older than the topic requires, run another search with the current year before answering.
+- State an as-of date in the answer when covering current events (using the current year/month from the date context). Never frame "now" using a year earlier than today.
+
 Hard limits (prevent endless loops):
 - Simple questions: 2–3 search calls max
 - Complex research / PDF reports: aim ≤ 6 web_search calls and ≤ 4 fetch_url calls before writing the answer
@@ -63,6 +70,27 @@ PDF reports:
 - Answer in the language the user writes in.`;
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+
+/** Dynamic temporal context — kept out of the static SYSTEM_PROMPT so the
+ *  main prompt stays a cache-friendly stable prefix. Regenerated every request. */
+function temporalContextMessage(): string {
+  const now = new Date();
+  const isoDate = now.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+  const human = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+  const year = now.getUTCFullYear();
+  return (
+    `Current UTC date: ${isoDate} (${human}). Current year: ${year}.\n` +
+    `Use this as "today" for research. When searching for current events, prefer ` +
+    `queries with ${year} (or no year) — do not default to older years. ` +
+    `Ground answers in the most recent reliable sources and say as-of dates when relevant.`
+  );
+}
 
 function sseEncode(event: Record<string, unknown>): Uint8Array {
   return new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`);
@@ -180,8 +208,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Build conversation. Stable system prompt first (cache-friendly prefix),
-  // then persisted turns, then the new user message.
-  const messages: ChatMessage[] = [{ role: "system", content: SYSTEM_PROMPT }];
+  // then dynamic "today" context, then persisted turns, then the new user message.
+  const messages: ChatMessage[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: temporalContextMessage() },
+  ];
   for (const m of history ?? []) {
     const c = m.content as { text?: string; status?: string };
     // skip in-flight progress rows (empty text / running) — not model turns

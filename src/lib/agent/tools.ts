@@ -8,11 +8,15 @@ export const TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "web_search",
       description:
-        "Search the web for current information. Returns top results with title, url and snippet. Use multiple focused queries for deep research.",
+        "Search the web for current information. Returns top results with title, url and snippet. Use multiple focused queries for deep research. For latest/now/current events, use the current year from context (or omit the year) — do not default to past years.",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "The search query" },
+          query: {
+            type: "string",
+            description:
+              "The search query. Prefer current year for recent topics; only pin an older year if the user asked for that period.",
+          },
           count: { type: "number", description: "Number of results (1-10), default 6" },
         },
         required: ["query"],
