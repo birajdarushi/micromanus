@@ -19,7 +19,19 @@ export default function PostHogProvider() {
       capture_pageview: true,
       capture_pageleave: true,
       persistence: "localStorage+cookie",
+      // Session replay — also requires Session Replay enabled in PostHog project settings.
+      disable_session_recording: false,
+      session_recording: {
+        // type=password is masked by default; also mask API key / promo fields by test id.
+        maskTextSelector: "[data-ph-mask], [data-testid='api-key-input']",
+        maskAllInputs: false,
+        maskInputOptions: {
+          password: true,
+        },
+      },
     });
+    // Explicitly start so recording is active even if sampling/flags would defer it.
+    posthog.startSessionRecording(true);
   }, []);
 
   return null;
