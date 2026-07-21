@@ -37,6 +37,10 @@ function SettingsInner() {
   const [busy, setBusy] = useState(false);
   const [promo, setPromo] = useState("");
   const [redeeming, setRedeeming] = useState(false);
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [patToken, setPatToken] = useState<string | null>(null);
+  const [patBusy, setPatBusy] = useState(false);
 
   async function redeem(e: React.FormEvent) {
     e.preventDefault();
@@ -300,6 +304,83 @@ function SettingsInner() {
                 {redeeming ? "Redeeming…" : "Redeem"}
               </button>
             </form>
+          </div>
+
+          {/* Channel link + PAT (gateway surfaces) */}
+          <div>
+            <h2 className="text-sm font-medium text-zinc-100">Channels &amp; connectors</h2>
+            <p className="text-zinc-500 text-xs mt-1 mb-3">
+              Link Discord/WhatsApp with a one-time code, or create a PAT for CLI/host tools
+              (they keep their own login — PAT only unlocks MicroManus research).
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={linkBusy}
+                data-testid="link-code-btn"
+                onClick={async () => {
+                  setLinkBusy(true);
+                  setLinkCode(null);
+                  try {
+                    const res = await fetch("/api/v1/link/code", { method: "POST" });
+                    const d = await res.json();
+                    if (!res.ok) throw new Error(d.error ?? "Failed");
+                    setLinkCode(d.code);
+                    toast.success("Link code ready — expires in 15 minutes");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Failed");
+                  } finally {
+                    setLinkBusy(false);
+                  }
+                }}
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {linkBusy ? "…" : "Generate link code"}
+              </button>
+              <button
+                type="button"
+                disabled={patBusy}
+                data-testid="create-pat-btn"
+                onClick={async () => {
+                  setPatBusy(true);
+                  setPatToken(null);
+                  try {
+                    const res = await fetch("/api/v1/tokens", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: "CLI / connector" }),
+                    });
+                    const d = await res.json();
+                    if (!res.ok) throw new Error(d.error ?? "Failed");
+                    setPatToken(d.token);
+                    toast.success("Token created — copy it now");
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Failed");
+                  } finally {
+                    setPatBusy(false);
+                  }
+                }}
+                className="rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {patBusy ? "…" : "Create connector token"}
+              </button>
+            </div>
+            {linkCode && (
+              <p className="mt-3 font-mono text-sm text-amber-300" data-testid="link-code-value">
+                Code: {linkCode}
+                <span className="block text-zinc-500 text-xs mt-1">
+                  Discord: /link code:{linkCode} · WhatsApp: link {linkCode}
+                </span>
+              </p>
+            )}
+            {patToken && (
+              <p className="mt-3 font-mono text-xs text-amber-300 break-all" data-testid="pat-value">
+                {patToken}
+                <span className="block text-zinc-500 mt-1">
+                  Shown once. Use as Authorization: Bearer … on POST /api/v1/turns
+                </span>
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -19,6 +19,16 @@ BRAVE_SEARCH_API_KEY=               # optional fallback if SerpAPI unset
 NEXT_PUBLIC_POSTHOG_KEY=            # phc_…
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 
+# Gateway surfaces (optional — Discord / WhatsApp / CLI PAT)
+DISCORD_BOT_TOKEN=
+DISCORD_PUBLIC_KEY=
+DISCORD_APPLICATION_ID=
+DISCORD_GUILD_ID=                   # optional, faster command sync
+WHATSAPP_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_APP_SECRET=                # optional
+
 # Welcome email (optional)
 GMAIL_USER=
 GMAIL_APP_PASSWORD=                 # Google App Password, not account password

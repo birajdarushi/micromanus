@@ -59,14 +59,14 @@ export const TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "think",
       description:
-        "Reflect and plan next steps (no web access). Call after searches/reads to assess what you found, what's missing, and what to do next. Do not call in parallel with other tools.",
+        "Reflect and plan next steps (no web access). Call alone after a search/read batch: list findings, gaps, and whether to search again, fetch more pages, or answer. If gaps remain, your next step should be another tool batch — multi-round research is expected.",
       parameters: {
         type: "object",
         properties: {
           reflection: {
             type: "string",
             description:
-              "What you learned, what's still missing, and the next action (search more / read / write answer / PDF).",
+              "What you learned, what's still missing, and the next action (search again with new queries / fetch URLs / write answer / PDF).",
           },
         },
         required: ["reflection"],

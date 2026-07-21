@@ -6,6 +6,12 @@ mode). The LLM is whatever OpenAI-compatible endpoint + key the **user** configu
 the app never ships a key. Deployed as a single Heroku web dyno (long-lived Node
 process → SSE streaming works, no serverless timeout).
 
+**Multi-surface direction:** see [GATEWAY.md](./GATEWAY.md). The research loop lives in
+`src/providers/micromanus/research.ts` (`runAgentTurn`) so it can be invoked from more
+than the web route. Gateway contracts are shared types only—**MicroManus product
+surfaces** (web/Discord/WA) and a **standalone host/CLI gateway** are separate contexts
+that may reuse contracts, not a merge of Grok (or any CLI) into MM.
+
 ```
 Browser ──(cookies/Supabase session)── Next.js on Heroku
    │                                        │
